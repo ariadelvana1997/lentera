@@ -88,7 +88,7 @@ export default function AdminPage() {
       {/* Footer Signature DELVANA */}
       <div className="text-center pt-4 md:pt-8">
         <p className="text-[9px] md:text-[10px] text-muted-foreground font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-40">
-          LENTERA Integrated Admin Dashboard • Created by DELVANA
+          Layanan Elektronik Nilai Terpadu dan Rapor Akademik • Created by DELVANA dan Ceu Ai
         </p>
       </div>
     </div>
