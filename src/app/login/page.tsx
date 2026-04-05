@@ -22,43 +22,57 @@ export default function LoginPage() {
     setLoading(true)
     setErrorMsg("")
 
-    // 1. Ambil data user dari hasil login Supabase
+    // 1. Proses Login Supabase
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setErrorMsg("Email atau kata sandi salah.")
       setLoading(false)
-    } else {
-      // 2. Ambil email user yang berhasil masuk
-      const userEmail = data.user?.email
+      return
+    }
 
-      // 3. Logika Navigasi berdasarkan pola email (Admin, Wali, Guru, Siswa)
-      if (userEmail?.includes("admin")) {
-        router.push("/admin")
-      } else if (userEmail?.includes("wali")) {
-        router.push("/walikelas")
-      } else if (userEmail?.includes("guru")) {
-        router.push("/guru")
-      } else if (userEmail?.includes("siswa")) {
-        router.push("/siswa")
-      } else {
-        router.push("/") // Default jika tidak terdeteksi
+    try {
+      // 2. AMBIL ROLE ASLI DARI TABEL PROFILES
+      // Ini bagian paling penting supaya navigasi gak nyasar
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('roles')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profileError || !profile) {
+        throw new Error("Data profil tidak ditemukan di database.")
       }
-      
-      router.refresh()
+
+      // 3. LOGIKA NAVIGASI BERDASARKAN ROLE (Bukan Tulisan Email)
+      const userRoles = profile.roles || []
+
+      if (userRoles.includes("Admin")) {
+        window.location.href = "/admin/pengguna" // Gunakan window.location agar refresh total
+      } else if (userRoles.includes("Walikelas")) {
+        window.location.href = "/walikelas"
+      } else if (userRoles.includes("Guru")) {
+        window.location.href = "/guru"
+      } else if (userRoles.includes("Siswa")) {
+        window.location.href = "/siswa"
+      } else {
+        window.location.href = "/dashboard" // Fallback
+      }
+
+    } catch (err: any) {
+      setErrorMsg(err.message)
+      setLoading(false)
+      // Opsional: Logout jika profil gagal diambil agar tidak nanggung
+      await supabase.auth.signOut()
     }
   }
 
   return (
-    // Container utama: transition-colors 1000ms untuk efek mengalir pada background
     <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 sm:p-6 md:p-8 relative overflow-hidden transition-colors duration-1000 ease-in-out">
-      
-      {/* Tombol ganti mode tetap di pojok kanan atas */}
       <div className="absolute top-4 right-4 z-50">
         <ModeToggle />
       </div>
 
-      {/* Background Pattern: Menggunakan var(--border) agar titik-titik ikut 'flow' berganti warna */}
       <div 
         className="absolute inset-0 pointer-events-none opacity-30 dark:opacity-10 transition-all duration-1000 ease-in-out"
         style={{
@@ -68,7 +82,6 @@ export default function LoginPage() {
         }}
       />
 
-      {/* Card Wrapper - Tetap statis sesuai permintaanmu */}
       <div className="w-full max-w-[400px] z-10">
         <Card className="relative w-full border-none shadow-none bg-transparent sm:bg-card/40 sm:backdrop-blur-md sm:p-2 sm:rounded-3xl transition-colors duration-1000">
           <CardHeader className="space-y-3 text-center pb-6 md:pb-8">
