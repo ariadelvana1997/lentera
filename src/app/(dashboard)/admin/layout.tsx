@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation" // Tambahkan useRouter
 import { 
   LayoutDashboard, Users, GraduationCap, 
   BookOpen, Settings, LogOut, Flame, Menu, X,
@@ -10,11 +10,14 @@ import {
 import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase" // Import supabase client
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false) // State loading logout
 
   // Auto-close mobile menu on desktop resize
   useEffect(() => {
@@ -24,6 +27,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // Fungsi Logout
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      
+      router.push("/login")
+      router.refresh()
+    } catch (error: any) {
+      console.error("Error logging out:", error.message)
+      setIsLoggingOut(false)
+    }
+  }
 
   const menu = [
     { name: "Beranda", href: "/admin", icon: LayoutDashboard },
@@ -76,9 +94,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
 
           <div className="pt-4 border-t mt-auto">
-            <Button variant="ghost" className="w-full justify-start gap-3 text-red-500 h-12 rounded-xl">
-              <LogOut className="w-5 h-5" />
-              <span className="text-sm font-semibold">Keluar Aplikasi</span>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start gap-3 text-red-500 h-12 rounded-xl"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <LogOut className={`w-5 h-5 ${isLoggingOut ? "animate-pulse" : ""}`} />
+              <span className="text-sm font-semibold">
+                {isLoggingOut ? "Keluar..." : "Keluar Aplikasi"}
+              </span>
             </Button>
           </div>
         </div>
@@ -122,16 +147,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="p-4 border-t">
-          <Button variant="ghost" className={`w-full flex items-center text-red-500 hover:bg-red-50 rounded-xl h-11 ${
-            isCollapsed ? "justify-center px-0" : "justify-start gap-3 px-4"
-          }`}>
-            <LogOut className="w-5 h-5 shrink-0" />
-            {!isCollapsed && <span className="text-sm font-semibold">Keluar</span>}
+          <Button 
+            variant="ghost" 
+            className={`w-full flex items-center text-red-500 hover:bg-red-50 rounded-xl h-11 ${
+              isCollapsed ? "justify-center px-0" : "justify-start gap-3 px-4"
+            }`}
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+          >
+            <LogOut className={`w-5 h-5 shrink-0 ${isLoggingOut ? "animate-pulse" : ""}`} />
+            {!isCollapsed && (
+              <span className="text-sm font-semibold">
+                {isLoggingOut ? "Keluar..." : "Keluar"}
+              </span>
+            )}
           </Button>
         </div>
       </aside>
 
-      {/* --- MAIN AREA (FIXED FOR MOBILE FIT) --- */}
+      {/* --- MAIN AREA --- */}
       <main className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
         {/* TOPBAR */}
         <header className="h-16 border-b flex items-center justify-between px-4 md:px-8 sticky top-0 bg-background/80 backdrop-blur-md z-40 transition-all">
@@ -150,7 +184,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="flex items-center gap-1.5 md:gap-4 shrink-0">
-            {/* ModeToggle dikurangi sedikit skalanya agar lebih proporsional di mobile */}
             <div className="scale-90 md:scale-100 origin-right">
               <ModeToggle />
             </div>
@@ -166,7 +199,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
         
-        {/* Content Container (Fit & Scrollable) */}
+        {/* Content Container */}
         <div className="p-4 md:p-8 flex-1 overflow-x-hidden overflow-y-auto bg-slate-50/30 dark:bg-transparent">
           <div className="max-w-full mx-auto">
             {children}
