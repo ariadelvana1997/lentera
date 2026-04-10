@@ -1,4 +1,3 @@
-// src/app/actions/register-user.ts
 'use server'
 
 import { createClient } from '@supabase/supabase-js'
@@ -40,5 +39,6 @@ export async function registerUserAction(formData: any) {
 
   if (profileError) return { success: false, message: profileError.message }
 
-  return { success: true }
+  // --- PERUBAHAN DI SINI: Mengembalikan data user agar ID bisa dibaca frontend ---
+  return { success: true, user: authUser.user }
 }

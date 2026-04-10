@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { 
   Dialog, DialogContent, DialogDescription, 
@@ -56,7 +55,6 @@ export default function ReferensiKelasPage() {
   const fetchData = async () => {
     setFetching(true)
     try {
-      // 1. Ambil Data Kelas + Join Nama Wali + Hitung Siswa
       const { data: kelas } = await supabase
         .from('kelas')
         .select(`
@@ -66,7 +64,6 @@ export default function ReferensiKelasPage() {
         `)
         .order('tingkat', { ascending: true })
 
-      // 2. Ambil Semua Profile (Gunakan filter JS agar dropdown terisi)
       const { data: allProfiles } = await supabase
         .from('profiles')
         .select('id, nama_lengkap, roles, kelas_id')
@@ -97,15 +94,14 @@ export default function ReferensiKelasPage() {
       .filter(s => s.kelas_id === kelas.id)
       .map(s => s.id)
     setMappingSelection(currentMembers)
+    setSearchTerm("") 
     setIsMappingOpen(true)
   }
 
   const handleSaveMapping = async () => {
     setLoading(true)
     try {
-      // Reset kelas_id siswa lama
       await supabase.from('profiles').update({ kelas_id: null }).eq('kelas_id', selectedClass.id)
-      // Update kelas_id siswa baru (Bulk)
       if (mappingSelection.length > 0) {
         const { error } = await supabase.from('profiles').update({ kelas_id: selectedClass.id }).in('id', mappingSelection)
         if (error) throw error
@@ -133,15 +129,19 @@ export default function ReferensiKelasPage() {
     finally { setLoading(false) }
   }
 
-  const filteredStudents = availableStudents.filter(s => 
-    s.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // --- LOGIC FILTER: Siswa kelas lain "HILANG" ---
+  const filteredStudents = availableStudents.filter(s => {
+    const matchesSearch = s.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase());
+    // Tampil HANYA JIKA belum punya kelas ATAU siswa ini memang anggota kelas yang sedang dibuka
+    const isAvailableOrInThisClass = s.kelas_id === null || s.kelas_id === selectedClass?.id;
+    return matchesSearch && isAvailableOrInThisClass;
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3 italic">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3 ">
             <LayoutGrid className="w-8 h-8 text-primary" /> Referensi Kelas
           </h1>
           <p className="text-muted-foreground text-xs md:text-sm font-bold uppercase tracking-widest leading-none mt-1">Kelola Rombongan Belajar & Wali Kelas</p>
@@ -173,7 +173,7 @@ export default function ReferensiKelasPage() {
                   <Badge variant="outline" className="rounded-md text-[8px] font-black uppercase px-2 py-0 border-primary/30 text-primary bg-primary/5">{item.kurikulum}</Badge>
                 </TableCell>
                 <TableCell className="font-black text-sm uppercase">{item.nama_kelas} <span className="text-[10px] opacity-40 ml-1">({item.tingkat})</span></TableCell>
-                <TableCell className="text-[11px] font-bold uppercase text-muted-foreground italic">
+                <TableCell className="text-[11px] font-bold uppercase text-muted-foreground ">
                   {item.wali?.nama_lengkap || <span className="text-red-400">Belum diatur</span>}
                 </TableCell>
                 <TableCell className="text-center">
@@ -218,36 +218,86 @@ export default function ReferensiKelasPage() {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG MAPPING SISWA MASSAL */}
+      {/* DIALOG MAPPING SISWA (VERSI ANTI-LENGKET & AUTO-FILTER) */}
       <Dialog open={isMappingOpen} onOpenChange={setIsMappingOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[85vh] rounded-[2.5rem] p-0 border-none shadow-2xl flex flex-col overflow-hidden">
-          <div className="p-8 pb-4 bg-primary/5">
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Anggota Kelas {selectedClass?.nama_kelas}</DialogTitle>
-            <div className="mt-4 relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Cari nama siswa..." className="pl-10 rounded-xl border-none bg-white shadow-sm h-10 text-xs font-bold" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        <DialogContent className="sm:max-w-[500px] h-[90vh] max-h-[700px] rounded-[2.5rem] p-0 border-none shadow-2xl flex flex-col bg-white overflow-hidden">
+          
+          {/* 1. HEADER (STIKY - TIDAK IKUT SCROLL) */}
+          <div className="p-8 pb-6 bg-primary/5 shrink-0 border-b border-primary/10">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight  flex items-center gap-3">
+                <Users className="w-6 h-6 text-primary" /> Anggota {selectedClass?.nama_kelas}
+              </DialogTitle>
+              <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
+                Siswa kelas lain otomatis disembunyikan.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-5 relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Input 
+                placeholder="Cari nama siswa..." 
+                className="pl-12 rounded-2xl border-none bg-white shadow-sm h-12 text-xs font-black uppercase " 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+              />
             </div>
           </div>
-          <ScrollArea className="flex-1 px-8 py-4">
-            <div className="space-y-2 pb-8">
-              {filteredStudents.map((siswa) => (
-                <label key={siswa.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer ${mappingSelection.includes(siswa.id) ? "bg-primary/5 border-primary shadow-sm" : "border-transparent hover:bg-muted/40"}`}>
+
+          {/* 2. AREA DAFTAR (SCROLLABLE AREA) */}
+          {/* overflow-y-auto adalah kunci agar bagian ini saja yang bisa digulung */}
+          <div className="flex-1 overflow-y-auto bg-white/50">
+            <div className="p-8 space-y-3">
+              {filteredStudents.length === 0 ? (
+                <div className="text-center py-20 opacity-20">
+                  <SearchCheck className="w-16 h-16 mx-auto mb-2" />
+                  <p className="text-[10px] font-black uppercase ">Tidak ada siswa tersedia.</p>
+                </div>
+              ) : filteredStudents.map((siswa) => (
+                <label 
+                  key={siswa.id} 
+                  className={`flex items-center justify-between p-5 rounded-[1.5rem] border transition-all cursor-pointer group ${
+                    mappingSelection.includes(siswa.id) 
+                      ? "bg-primary/5 border-primary shadow-sm" 
+                      : "border-transparent hover:bg-muted/40"
+                  }`}
+                >
                   <div className="flex flex-col">
-                    <span className="text-sm font-black uppercase">{siswa.nama_lengkap}</span>
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase mt-1">{siswa.kelas_id && siswa.kelas_id !== selectedClass?.id ? 'Pindah dari kelas lain' : 'Siap dipetakan'}</span>
+                    <span className="text-sm font-black uppercase group-hover:text-primary transition-colors">
+                      {siswa.nama_lengkap}
+                    </span>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase mt-0.5">
+                      {siswa.id && mappingSelection.includes(siswa.id) ? 'Anggota Aktif' : 'Tersedia'}
+                    </span>
                   </div>
-                  <Checkbox checked={mappingSelection.includes(siswa.id)} onCheckedChange={() => setMappingSelection(prev => prev.includes(siswa.id) ? prev.filter(i => i !== siswa.id) : [...prev, siswa.id])} className="w-5 h-5 rounded-md" />
+                  <Checkbox 
+                    checked={mappingSelection.includes(siswa.id)} 
+                    onCheckedChange={() => setMappingSelection(prev => 
+                      prev.includes(siswa.id) ? prev.filter(i => i !== siswa.id) : [...prev, siswa.id]
+                    )} 
+                    className="w-6 h-6 rounded-lg border-muted-foreground/30" 
+                  />
                 </label>
               ))}
             </div>
-          </ScrollArea>
-          <div className="p-8 bg-muted/20 border-t flex flex-col gap-3">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-[10px] font-black uppercase text-muted-foreground italic">Total Terpilih:</span>
-              <span className="text-[11px] font-black text-primary bg-primary/10 px-3 py-1 rounded-full">{mappingSelection.length} Siswa</span>
+          </div>
+
+          {/* 3. FOOTER (STIKY - TIDAK IKUT SCROLL) */}
+          <div className="p-8 bg-muted/20 shrink-0 border-t border-border/50 shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
+            <div className="flex justify-between items-center mb-5 px-2">
+              <div className="flex flex-col">
+                 <span className="text-[9px] font-black uppercase text-muted-foreground  leading-none mb-1">Total Terpilih</span>
+                 <span className="text-xl font-black text-primary tracking-tighter leading-none">{mappingSelection.length} Siswa</span>
+              </div>
+              <Badge variant="outline" className="rounded-full border-primary/20 text-primary font-black px-5 py-1 bg-white shadow-sm text-[10px] ">
+                {filteredStudents.length} Tersedia
+              </Badge>
             </div>
-            <Button onClick={handleSaveMapping} className="w-full h-12 rounded-xl font-black shadow-lg shadow-primary/20" disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />} 
+            <Button 
+              onClick={handleSaveMapping} 
+              className="w-full h-14 rounded-2xl font-black shadow-xl shadow-primary/20 uppercase tracking-widest text-xs " 
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />} 
               TERAPKAN ANGGOTA KELAS
             </Button>
           </div>

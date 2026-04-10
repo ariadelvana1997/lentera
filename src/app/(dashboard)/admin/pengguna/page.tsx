@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabase"
 import { registerUserAction } from "@/app/actions/register-user" 
 import { 
   Search, UserPlus, Edit2, Trash2, Loader2, 
-  ChevronLeft, ChevronRight, Rocket, Trash, CheckCircle2
+  ChevronLeft, ChevronRight, Rocket, Trash, CheckCircle2,
+  RefreshCw // Tambahan icon untuk acak ulang
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,7 +41,6 @@ export default function PenggunaPage() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   
-  // --- STATE BARU: SELECTION & PAGINATION ---
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 5
@@ -51,6 +51,12 @@ export default function PenggunaPage() {
     password: "",
     roles: [] as string[]
   })
+
+  // --- HELPER: GENERATE EMAIL INSTITUSI (5 DIGIT) ---
+  const generateInstitutionalEmail = () => {
+    const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
+    return `${randomDigits}@lentera.app`;
+  };
 
   useEffect(() => {
     fetchUsers()
@@ -73,7 +79,6 @@ export default function PenggunaPage() {
     }
   }
 
-  // Logika Filter
   const getFilteredUsers = (roleFilter: string) => {
     return users.filter(user => {
       const matchesRole = roleFilter === "Semua" || user.roles?.includes(roleFilter)
@@ -84,7 +89,6 @@ export default function PenggunaPage() {
     })
   }
 
-  // --- LOGIKA MULTI-SELECT ---
   const handleSelectAll = (currentUsers: any[]) => {
     if (selectedIds.length === currentUsers.length) {
       setSelectedIds([])
@@ -116,10 +120,8 @@ export default function PenggunaPage() {
     }
   }
 
-  // --- FITUR AUTOPILOT ---
   const handleAutopilot = (user: any) => {
     alert(`Mode Autopilot Aktif: Menyamar sebagai ${user.nama_lengkap} (${user.roles?.[0] || 'User'})`)
-    // Logika: Biasanya redirect ke dashboard tujuan dengan query params atau session sementara
     const target = user.roles?.[0]?.toLowerCase() || "dashboard"
     window.open(`/${target}?autopilot=${user.id}`, "_blank")
   }
@@ -183,7 +185,9 @@ export default function PenggunaPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground">Master Pengguna</h1>
-          <p className="text-muted-foreground text-xs md:text-sm">Kelola data login dan hak akses LENTERA.</p>
+          <p className="text-muted-foreground text-xs md:text-sm font-bold uppercase tracking-widest leading-none mt-1">
+            Kelola data login dan hak akses LENTERA.
+          </p>
         </div>
         <div className="flex gap-2">
           {selectedIds.length > 0 && (
@@ -195,7 +199,9 @@ export default function PenggunaPage() {
           <Button 
             onClick={() => { 
               setIsEditMode(false); 
-              setFormData({nama:"", email:"", password:"", roles:[]}); 
+              // --- GENERATE EMAIL OTOMATIS SAAT TAMBAH ---
+              const autoEmail = generateInstitutionalEmail();
+              setFormData({nama:"", email: autoEmail, password:"", roles:[]}); 
               setIsDialogOpen(true); 
             }} 
             className="rounded-xl h-11 gap-2 font-bold shadow-lg shadow-primary/20 shrink-0"
@@ -210,7 +216,7 @@ export default function PenggunaPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <TabsList className="bg-muted/50 p-1 rounded-2xl border w-fit">
             {["Semua", "Admin", "Guru", "Siswa"].map(tab => (
-              <TabsTrigger key={tab} value={tab} className="rounded-xl px-6 font-bold text-xs">
+              <TabsTrigger key={tab} value={tab} className="rounded-xl px-6 font-bold text-xs uppercase tracking-tighter">
                 {tab}
               </TabsTrigger>
             ))}
@@ -221,7 +227,7 @@ export default function PenggunaPage() {
             <input 
               type="text"
               placeholder="Cari nama atau email..." 
-              className="w-full pl-12 rounded-2xl h-11 bg-card/50 border-none shadow-inner focus-visible:outline-none focus:ring-1 focus:ring-primary transition-all text-sm"
+              className="w-full pl-12 rounded-2xl h-11 bg-card/50 border-none shadow-inner focus-visible:outline-none focus:ring-1 focus:ring-primary transition-all text-sm font-bold"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             />
@@ -256,7 +262,7 @@ export default function PenggunaPage() {
                       {fetching ? (
                         <TableRow><TableCell colSpan={5} className="h-40 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
                       ) : currentData.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="h-40 text-center text-muted-foreground font-medium">Tidak ada data ditemukan.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-40 text-center text-muted-foreground font-bold uppercase text-[10px]  tracking-widest">Tidak ada data ditemukan.</TableCell></TableRow>
                       ) : (
                         currentData.map((user) => (
                           <TableRow key={user.id} className={`hover:bg-muted/10 transition-colors border-border/50 ${selectedIds.includes(user.id) ? "bg-primary/5" : ""}`}>
@@ -268,12 +274,12 @@ export default function PenggunaPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600 font-black text-xs border border-amber-500/20">
+                                <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs border border-primary/20">
                                   {user.nama_lengkap?.charAt(0) || "U"}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="font-bold text-sm truncate leading-none">{user.nama_lengkap}</p>
-                                  <p className="text-[10px] text-muted-foreground mt-1.5 truncate">{user.email}</p>
+                                  <p className="font-black text-sm truncate leading-none uppercase ">{user.nama_lengkap}</p>
+                                  <p className="text-[10px] text-muted-foreground mt-2 truncate font-mono">{user.email}</p>
                                 </div>
                               </div>
                             </TableCell>
@@ -286,7 +292,7 @@ export default function PenggunaPage() {
                                 ))}
                               </div>
                             </TableCell>
-                            <TableCell className="text-[10px] text-muted-foreground font-bold">
+                            <TableCell className="text-[10px] text-muted-foreground font-black uppercase">
                               {new Date(user.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </TableCell>
                             <TableCell className="text-right p-6">
@@ -310,10 +316,9 @@ export default function PenggunaPage() {
                 </div>
               </Card>
 
-              {/* --- PAGINATION CONTROLS --- */}
               {!fetching && totalPages > 1 && (
                 <div className="flex items-center justify-between px-6 py-4 bg-muted/20 rounded-3xl border border-border/50">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none mt-1">
                     Halaman {currentPage} dari {totalPages}
                   </span>
                   <div className="flex gap-2">
@@ -340,21 +345,42 @@ export default function PenggunaPage() {
       </Tabs>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-[2rem] p-8 border-none shadow-2xl overflow-hidden focus-visible:outline-none">
+        <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] p-8 border-none shadow-2xl overflow-hidden focus-visible:outline-none bg-white/95 backdrop-blur-md">
           <form onSubmit={handleSubmit} className="space-y-6">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tight">{isEditMode ? "Edit Pengguna" : "Registrasi Baru"}</DialogTitle>
-              <DialogDescription>Input data dengan benar agar tidak terjadi duplikasi akun.</DialogDescription>
+              <DialogTitle className="text-2xl font-black tracking-tighter uppercase ">{isEditMode ? "Edit Pengguna" : "Registrasi Baru"}</DialogTitle>
+              <DialogDescription className="text-xs font-bold uppercase text-muted-foreground">Pastikan data yang diinput sudah sesuai dengan identitas asli.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid gap-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nama Lengkap</Label>
-                <Input value={formData.nama} onChange={(e) => setFormData({...formData, nama: e.target.value})} className="rounded-xl h-12 bg-muted/30 border-none focus-visible:ring-1" required />
+                <Input value={formData.nama} onChange={(e) => setFormData({...formData, nama: e.target.value})} className="rounded-xl h-12 bg-muted/30 border-none focus-visible:ring-1 font-bold text-sm" required />
               </div>
+              
               <div className="grid gap-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Email Institusi</Label>
-                <Input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="rounded-xl h-12 bg-muted/30 border-none focus-visible:ring-1" disabled={isEditMode} required />
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex justify-between items-center">
+                  Email Institusi (Otomatis)
+                  {!isEditMode && (
+                    <button 
+                      type="button" 
+                      onClick={() => setFormData({...formData, email: generateInstitutionalEmail()})}
+                      className="text-primary hover:underline flex items-center gap-1 font-black"
+                    >
+                      <RefreshCw className="w-3 h-3" /> ACAK ULANG
+                    </button>
+                  )}
+                </Label>
+                <Input 
+                  type="email" 
+                  value={formData.email} 
+                  readOnly={!isEditMode}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                  className={`rounded-xl h-12 border-none focus-visible:ring-1 font-mono text-sm ${!isEditMode ? 'bg-primary/5 text-primary font-bold' : 'bg-muted/30'}`} 
+                  disabled={isEditMode} 
+                  required 
+                />
               </div>
+
               {!isEditMode && (
                 <div className="grid gap-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Kata Sandi</Label>
@@ -363,7 +389,7 @@ export default function PenggunaPage() {
               )}
               
               <div className="space-y-3 pt-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Role</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pilih Hak Akses</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {ROLE_OPTIONS.map((role) => {
                     const active = formData.roles.includes(role.id);
@@ -379,7 +405,7 @@ export default function PenggunaPage() {
                           checked={active}
                           onCheckedChange={() => handleRoleToggle(role.id)}
                         />
-                        <span className="text-[11px] font-bold leading-none flex-1 py-1">
+                        <span className="text-[10px] font-black leading-none flex-1 py-1 uppercase ">
                           {role.label}
                         </span>
                       </label>
@@ -389,8 +415,8 @@ export default function PenggunaPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" className="w-full h-12 rounded-xl font-black text-sm shadow-lg shadow-primary/20" disabled={loading}>
-                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Simpan Data"}
+              <Button type="submit" className="w-full h-12 rounded-xl font-black text-xs shadow-lg shadow-primary/20 uppercase tracking-widest" disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Simpan Data Pengguna"}
               </Button>
             </DialogFooter>
           </form>
