@@ -47,29 +47,25 @@ export default function LegerNilaiPage() {
   const loadLeger = async (classId: string) => {
     setLoadingData(true)
     try {
-      console.log("DEBUG: Memulai muat Leger untuk Kelas:", classId);
-
       // 1. Ambil Mapel dari mapel_pengampu
-      // Pastikan nama join 'mapel:mata_pelajaran' sesuai dengan schema kamu
-     const { data: pengampu, error: errPengampu } = await supabase
-  .from('mapel_pengampu')
-  .select(`
-    mapel_id,
-    mapel:mata_pelajaran(id, nama_mapel) -- Hapus kode_mapel di sini
-  `)
-  .eq('kelas_id', classId)
+      // FIX: Menghapus komentar "--" yang menyebabkan ParserError di Vercel
+      const { data: pengampu, error: errPengampu } = await supabase
+        .from('mapel_pengampu')
+        .select(`
+          mapel_id,
+          mapel:mata_pelajaran(id, nama_mapel)
+        `)
+        .eq('kelas_id', classId)
 
-      if (errPengampu) console.error("ERROR PENGAMPU:", errPengampu.message);
-      
-      // LOG: Lihat apakah ada data pengampu yang ditemukan
-      console.log("DEBUG DATA PENGAMPU:", pengampu);
+      if (errPengampu) throw errPengampu;
+
+      // FIX: Casting ke "any[]" agar TypeScript tidak bingung saat proses .map()
+      const dataPengampu = (pengampu as any[]) || [];
 
       // Ambil ID mapel yang unik
       const uniqueSubjects = Array.from(
-        new Map(pengampu?.filter(p => p.mapel).map(p => [p.mapel?.id, p.mapel])).values()
+        new Map(dataPengampu.filter(p => p.mapel).map(p => [p.mapel?.id, p.mapel])).values()
       )
-
-      console.log("DEBUG SUBJECTS YG AKAN JADI KOLOM:", uniqueSubjects);
 
       // 2. Ambil Siswa
       const { data: siswa } = await supabase
@@ -80,6 +76,8 @@ export default function LegerNilaiPage() {
         .order('nama_lengkap')
 
       // 3. Ambil Nilai
+      const studentIds = (siswa as any[])?.map(s => s.id) || [];
+      
       const { data: nilai } = await supabase
         .from('nilai_akademik')
         .select(`
@@ -87,11 +85,13 @@ export default function LegerNilaiPage() {
           nilai_angka,
           mapel_pengampu!inner(mapel_id)
         `)
-        .in('siswa_id', siswa?.map(s => s.id) || [])
+        .in('siswa_id', studentIds)
 
       // 4. Mapping [siswa_id][mapel_id]
       const gMap: Record<string, any> = {}
-      nilai?.forEach(n => {
+      const dataNilai = (nilai as any[]) || [];
+      
+      dataNilai.forEach(n => {
         const mId = n.mapel_pengampu?.mapel_id
         if (mId) {
           if (!gMap[n.siswa_id]) gMap[n.siswa_id] = {}
@@ -104,7 +104,7 @@ export default function LegerNilaiPage() {
       setGradesMap(gMap)
 
       if (uniqueSubjects.length === 0) {
-        toast.error("Tidak ada Mata Pelajaran yang diatur untuk kelas ini di 'mapel_pengampu'");
+        toast.error("Tidak ada Mata Pelajaran yang diatur untuk kelas ini.");
       }
 
     } catch (err: any) {
@@ -117,7 +117,7 @@ export default function LegerNilaiPage() {
   const calculateAverage = (siswaId: string) => {
     const siswaGrades = gradesMap[siswaId] || {}
     const values = Object.values(siswaGrades).map(v => Number(v))
-    if (values.length === 0 || subjects.length === 0) return 0
+    if (values.length === 0 || subjects.length === 0) return "0"
     const sum = values.reduce((a, b) => a + b, 0)
     return (sum / subjects.length).toFixed(1)
   }
@@ -127,7 +127,7 @@ export default function LegerNilaiPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3  uppercase">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3 uppercase">
             <FileSpreadsheet className="w-8 h-8 text-primary" /> Leger Nilai
           </h1>
           <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none mt-1">
@@ -160,12 +160,14 @@ export default function LegerNilaiPage() {
             value={selectedClassId} 
             onValueChange={(v) => { setSelectedClassId(v); loadLeger(v); }}
           >
-            <SelectTrigger className="w-full md:w-80 rounded-xl border-none bg-white shadow-sm font-black text-xs h-11">
+            <SelectTrigger className="w-full md:w-80 rounded-xl border-none bg-white shadow-sm font-black text-xs h-11 focus:ring-2 focus:ring-primary/20">
               <SelectValue placeholder="Pilih kelas..." />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl border-none shadow-2xl">
               {classList.map((k) => (
-                <SelectItem key={k.id} value={k.id} className="font-bold uppercase text-[11px]">{k.nama_kelas}</SelectItem>
+                <SelectItem key={k.id} value={k.id} className="font-bold uppercase text-[11px] cursor-pointer">
+                  {k.nama_kelas}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -179,15 +181,14 @@ export default function LegerNilaiPage() {
             <Table>
               <TableHeader className="bg-muted/10">
                 <TableRow className="border-none">
-                  <TableHead className="sticky left-0 bg-white/50 backdrop-blur-sm z-20 w-12 p-6 text-center font-black text-[10px] uppercase text-muted-foreground border-r">No</TableHead>
-                  <TableHead className="sticky left-12 bg-white/50 backdrop-blur-sm z-20 w-64 font-black text-[10px] uppercase text-primary border-r">Nama Siswa</TableHead>
+                  <TableHead className="sticky left-0 bg-white/80 backdrop-blur-md z-20 w-12 p-6 text-center font-black text-[10px] uppercase text-muted-foreground border-r">No</TableHead>
+                  <TableHead className="sticky left-12 bg-white/80 backdrop-blur-md z-20 w-64 font-black text-[10px] uppercase text-primary border-r">Nama Siswa</TableHead>
                   
                   {subjects.map((m) => (
-  <TableHead key={m.id} className="text-center font-black text-[10px] uppercase text-muted-foreground px-4 min-w-[100px] border-r">
-    {/* Pakai nama_mapel kalau kode_mapel tidak ada */}
-    {m.kode_mapel || m.nama_mapel}
-  </TableHead>
-))}
+                    <TableHead key={m.id} className="text-center font-black text-[10px] uppercase text-muted-foreground px-4 min-w-[120px] border-r">
+                      {m.nama_mapel}
+                    </TableHead>
+                  ))}
                   
                   <TableHead className="text-center font-black text-[10px] uppercase text-primary bg-primary/5 px-6">Rata-Rata</TableHead>
                 </TableRow>
@@ -201,14 +202,14 @@ export default function LegerNilaiPage() {
                   </TableRow>
                 ) : students.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={subjects.length + 3} className="h-40 text-center font-bold text-muted-foreground uppercase text-xs ">
+                    <TableCell colSpan={subjects.length + 3} className="h-40 text-center font-bold text-muted-foreground uppercase text-xs">
                       Tidak ada siswa ditemukan.
                     </TableCell>
                   </TableRow>
                 ) : (
                   students.map((siswa, index) => (
                     <TableRow key={siswa.id} className="hover:bg-muted/5 border-border/50 transition-colors">
-                      <TableCell className="sticky left-0 bg-white/90 backdrop-blur-md text-center font-bold text-muted-foreground border-r">{index + 1}</TableCell>
+                      <TableCell className="sticky left-0 bg-white/90 backdrop-blur-md text-center font-bold text-muted-foreground border-r text-xs">{index + 1}</TableCell>
                       <TableCell className="sticky left-12 bg-white/90 backdrop-blur-md font-black text-[11px] uppercase py-4 border-r">
                         {siswa.nama_lengkap}
                       </TableCell>
@@ -240,7 +241,7 @@ export default function LegerNilaiPage() {
       ) : (
         <div className="flex flex-col items-center justify-center py-20 opacity-30">
           <AlertCircle className="w-16 h-16 mb-4" />
-          <p className="font-black text-sm uppercase  text-center text-muted-foreground">
+          <p className="font-black text-sm uppercase text-center text-muted-foreground">
             Pilih kelas untuk melihat rekapitulasi nilai.
           </p>
         </div>
