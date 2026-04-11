@@ -5,10 +5,47 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* --- 1. SISTEM FONT DINAMIS (30+ FONT) --- */
+  --font-app: var(--font-app-dynamic, var(--font-jakarta-sans));
+  --font-sans: var(--font-app);
+  --font-heading: var(--font-app);
+
+  /* Registrasi Utility Class Font */
+  --font-jakarta-sans: var(--font-jakarta-sans);
+  --font-inter: var(--font-inter);
+  --font-poppins: var(--font-poppins);
+  --font-montserrat: var(--font-montserrat);
+  --font-roboto: var(--font-roboto);
+  --font-opensans: var(--font-opensans);
+  --font-lato: var(--font-lato);
+  --font-oswald: var(--font-oswald);
+  --font-raleway: var(--font-raleway);
+  --font-nunito: var(--font-nunito);
+  --font-ubuntu: var(--font-ubuntu);
+  --font-playfair: var(--font-playfair);
+  --font-lora: var(--font-lora);
+  --font-kanit: var(--font-kanit);
+  --font-quicksand: var(--font-quicksand);
+  --font-firasans: var(--font-firasans);
+  --font-worksans: var(--font-worksans);
+  --font-bebasneue: var(--font-bebasneue);
+  --font-sourcesans: var(--font-sourcesans);
+  --font-merriweather: var(--font-merriweather);
+  --font-josefinsans: var(--font-josefinsans);
+  --font-arvo: var(--font-arvo);
+  --font-librebaskerville: var(--font-librebaskerville);
+  --font-anton: var(--font-anton);
+  --font-dancing: var(--font-dancing);
+  --font-pacifico: var(--font-pacifico);
+  --font-caveat: var(--font-caveat);
+  --font-inconsolata: var(--font-inconsolata);
+  --font-comfortaa: var(--font-comfortaa);
+  --font-exo2: var(--font-exo2);
+  --font-righteous: var(--font-righteous);
+
+  /* --- 2. KONFIGURASI WARNA & UI --- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-jakarta-sans);
-  --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -116,31 +153,6 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Gaya khusus untuk Read Mode (Sepia) */
-.read {
-  --background: oklch(0.92 0.02 85); /* Krem/Sepia lembut */
-  --foreground: oklch(0.25 0.04 45); /* Cokelat tua */
-  --card: oklch(0.94 0.02 85);
-  --card-foreground: oklch(0.25 0.04 45);
-  --primary: oklch(0.55 0.12 45);
-  --muted: oklch(0.88 0.02 85);
-  --border: oklch(0.82 0.02 85);
-}
-
-@layer base {
-  /* INI KUNCINYA: Paksa html dan body untuk transisi properti background */
-  html, body {
-    transition: background-color 1.2s cubic-bezier(0.4, 0, 0.2, 1), 
-                color 0.6s ease-in-out !important;
-  }
-  * {
-    @apply border-border outline-ring/50;
-    /* Efek transisi mengalir (flow) untuk semua elemen */
-    transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
-                border-color 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
-                color 0.4s ease-in-out;
-  }
-  /* Update Read Mode agar warnanya lebih kontras (Aesthetic Sepia) */
 .read {
   --background: oklch(0.94 0.03 80); 
   --foreground: oklch(0.25 0.05 40);
@@ -149,11 +161,111 @@
   --muted: oklch(0.90 0.03 80);
   --border: oklch(0.85 0.03 80);
 }
+
+/* --- 5 TEMA PREMIUM ADAPTIVE (LIGHT & DARK SUPPORT) --- */
+
+/* 1. Midnight Onyx */
+.midnight {
+  --background: oklch(0.98 0.01 250);
+  --foreground: oklch(0.15 0.02 250);
+  --primary: oklch(0.65 0.12 65);
+  --card: oklch(0.95 0.02 250);
+  --border: oklch(0 0 0 / 10%);
+}
+.dark .midnight {
+  --background: oklch(0.12 0.015 250);
+  --foreground: oklch(0.98 0.01 250);
+  --primary: oklch(0.75 0.1 65);
+  --card: oklch(0.15 0.02 250);
+  --border: oklch(1 0 0 / 10%);
+}
+
+/* 2. Royal Amethyst */
+.amethyst {
+  --background: oklch(0.98 0.02 290);
+  --foreground: oklch(0.2 0.08 290);
+  --primary: oklch(0.55 0.18 290);
+  --card: oklch(0.95 0.03 290);
+  --border: oklch(0 0 0 / 10%);
+}
+.dark .amethyst {
+  --background: oklch(0.18 0.06 290);
+  --foreground: oklch(0.95 0.02 290);
+  --primary: oklch(0.7 0.15 290);
+  --card: oklch(0.22 0.07 290);
+  --border: oklch(1 0 0 / 15%);
+}
+
+/* 3. Emerald Forest */
+.emerald {
+  --background: oklch(0.98 0.01 150);
+  --foreground: oklch(0.15 0.05 150);
+  --primary: oklch(0.45 0.15 150);
+  --card: oklch(0.95 0.02 150);
+  --border: oklch(0 0 0 / 10%);
+}
+.dark .emerald {
+  --background: oklch(0.15 0.04 150);
+  --foreground: oklch(0.95 0.02 150);
+  --primary: oklch(0.65 0.12 150);
+  --card: oklch(0.18 0.05 150);
+  --border: oklch(1 0 0 / 10%);
+}
+
+/* 4. Sunset Crimson */
+.crimson {
+  --background: oklch(0.98 0.01 25);
+  --foreground: oklch(0.15 0.06 25);
+  --primary: oklch(0.55 0.18 25);
+  --card: oklch(0.95 0.02 25);
+  --border: oklch(0 0 0 / 10%);
+}
+.dark .crimson {
+  --background: oklch(0.15 0.05 25);
+  --foreground: oklch(0.98 0.01 25);
+  --primary: oklch(0.65 0.15 25);
+  --card: oklch(0.18 0.06 25);
+  --border: oklch(1 0 0 / 10%);
+}
+
+/* 5. Oceanic Azure */
+.azure {
+  --background: oklch(0.97 0.02 250);
+  --foreground: oklch(0.15 0.08 250);
+  --primary: oklch(0.45 0.18 250);
+  --card: oklch(0.94 0.03 250);
+  --border: oklch(0 0 0 / 10%);
+}
+.dark .azure {
+  --background: oklch(0.15 0.06 250);
+  --foreground: oklch(0.95 0.02 250);
+  --primary: oklch(0.6 0.15 250);
+  --card: oklch(0.18 0.07 250);
+  --border: oklch(1 0 0 / 10%);
+}
+
+@layer base {
+  html, body {
+    transition: background-color 1.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                color 0.6s ease-in-out !important;
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+    font-family: var(--font-app) !important;
+    transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
+                border-color 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
+                color 0.4s ease-in-out;
+  }
+
   body {
     @apply bg-background text-foreground;
+    /* --- EFEK GLOW KEREN --- */
+    background-image: radial-gradient(at 0% 0%, var(--color-primary) 0px, transparent 20%);
+    background-attachment: fixed;
   }
   
   html {
-    @apply font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
