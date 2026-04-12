@@ -4,7 +4,7 @@ import { useState, useEffect, use } from "react"
 import { supabase } from "@/lib/supabase"
 import { 
   ChevronLeft, Loader2, Save, User, 
-  BookOpen, Target, Award, Info, Sparkles, AlertCircle, ListChecks
+  BookOpen, Sparkles, AlertCircle, Target, ListChecks
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,13 +18,13 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { toast } from "sonner"
 
-export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function WaliKelasInputNilaiDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: pengampuId } = use(params)
   
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
   const [pengampuInfo, setPengampuInfo] = useState<any>(null)
-  const [tpList, setTpList] = useState<any[]>([]) // <--- State baru untuk TP
+  const [tpList, setTpList] = useState<any[]>([]) // State untuk menampung TP dari referensi
   const [students, setStudents] = useState<any[]>([])
   const [gradesData, setGradesData] = useState<Record<string, any>>({})
   const [isAuthorized, setIsAuthorized] = useState(true)
@@ -33,12 +33,13 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
     loadData()
   }, [pengampuId])
 
-  const loadData = async () => {
+ const loadData = async () => {
     setFetching(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // 1. Ambil info pengampu
       const { data: pengampu } = await supabase
         .from('mapel_pengampu')
         .select(`
@@ -55,17 +56,17 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
         setFetching(false)
         return
       }
-
       setPengampuInfo(pengampu)
 
-      // --- LOGIKA "GACOR": AMBIL TP BERDASARKAN PENGAMPU_ID ---
+      // 2. AMBIL TUJUAN PEMBELAJARAN (Sesuai Screenshot: Pakai pengampu_id)
       const { data: tps } = await supabase
         .from('tujuan_pembelajaran')
         .select('deskripsi_tp')
-        .eq('pengampu_id', pengampuId)
+        .eq('pengampu_id', pengampuId) // <--- Kita ganti filternya ke sini
 
       setTpList(tps || [])
 
+      // 3. Ambil data siswa & nilai (tetap sama)
       const { data: siswa } = await supabase
         .from('profiles')
         .select('id, nama_lengkap')
@@ -108,7 +109,8 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
         updatedVal = parseInt(value) || 0
         const kktp = pengampuInfo?.kktp || 75
         
-        // --- GABUNGKAN TP REFERENSI UNTUK NARASI ---
+        // --- LOGIKA PENYATUAN TP ---
+        // Jika ada TP di list, gabungkan. Jika tidak, pakai info pengampu atau fallback.
         const tpReferensi = tpList.length > 0 
           ? tpList.map(t => t.deskripsi_tp).join(" serta ")
           : (pengampuInfo?.tujuan_pembelajaran || "kompetensi yang ditetapkan")
@@ -148,7 +150,7 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
         .upsert(payload, { onConflict: 'pengampu_id,siswa_id' })
 
       if (error) throw new Error(error.message)
-      toast.success("✅ Nilai berhasil disimpan ke sistem!");
+      toast.success("✅ Nilai & Deskripsi TP Berhasil Disimpan!");
     } catch (err: any) {
       toast.error("Gagal menyimpan: " + err.message)
     } finally {
@@ -159,11 +161,13 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
   if (fetching) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary w-10 h-10" /></div>
 
   if (!isAuthorized) return (
-    <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-4 ">
+    <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-4">
       <AlertCircle className="w-16 h-16 text-red-500 opacity-20" />
       <h2 className="text-xl font-black uppercase ">Akses Ditolak</h2>
-      <p className="text-muted-foreground text-sm font-bold uppercase">Anda tidak memiliki wewenang untuk mengisi nilai pada kelas ini.</p>
-      <Button asChild variant="outline" className="rounded-xl font-black uppercase text-[10px] tracking-widest "><Link href="/guru/penilaian">Kembali ke Daftar</Link></Button>
+      <p className="text-muted-foreground text-sm font-bold uppercase tracking-tighter">Anda tidak terdaftar sebagai pengampu di jadwal ini.</p>
+      <Button asChild variant="outline" className="rounded-xl font-black uppercase text-[10px] tracking-widest ">
+        <Link href="/walikelas/master-penilaian/input">Kembali ke Daftar</Link>
+      </Button>
     </div>
   )
 
@@ -173,32 +177,34 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" className="rounded-full bg-white shadow-sm border border-border/50 h-11 w-11">
-            <Link href="/guru/penilaian"><ChevronLeft className="w-5 h-5" /></Link>
+            <Link href="/walikelas/master-penilaian/input"><ChevronLeft className="w-5 h-5" /></Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-black uppercase tracking-tight leading-none ">Entry Nilai {pengampuInfo?.mapel?.nama_mapel}</h1>
+            <h1 className="text-2xl font-black uppercase tracking-tight leading-none ">
+              Input Nilai {pengampuInfo?.mapel?.nama_mapel}
+            </h1>
             <div className="flex items-center gap-2 mt-2">
               <Badge className="bg-primary/10 text-primary border-none font-black text-[9px] uppercase px-3 ">Kelas {pengampuInfo?.kelas?.nama_kelas}</Badge>
               <Badge className="bg-emerald-500/10 text-emerald-600 border-none font-black text-[9px] uppercase px-3 ">KKTP: {pengampuInfo?.kktp || 75}</Badge>
             </div>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={loading} className="rounded-2xl font-black h-12 px-8 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all uppercase text-[11px]  tracking-widest">
+        <Button onClick={handleSave} disabled={loading} className="rounded-2xl font-black h-12 px-8 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all uppercase text-[11px]  tracking-widest">
           {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />} 
-          SIMPAN DATA NILAI
+          SIMPAN NILAI & NARASI
         </Button>
       </div>
 
-      {/* REFERENSI TP CARD (Info Bar) */}
-      <Card className="border-none shadow-xl bg-primary/5 p-6 rounded-[2.5rem] flex items-start gap-4 border-l-4 border-l-primary">
-          <div className="h-10 w-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
+      {/* INFO TUJUAN PEMBELAJARAN (TP) DARI REFERENSI */}
+      <Card className="border-none shadow-xl bg-primary/5 p-6 rounded-[2rem] flex items-start gap-4 border-l-4 border-l-primary">
+          <div className="h-10 w-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
              <ListChecks className="w-5 h-5" />
           </div>
           <div>
-             <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Tujuan Pembelajaran Aktif:</p>
+             <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Tujuan Pembelajaran (Referensi):</p>
              <div className="mt-1 space-y-1">
                 {tpList.length > 0 ? tpList.map((t, i) => (
-                  <p key={i} className="text-xs font-black uppercase leading-tight text-primary ">
+                  <p key={i} className="text-xs font-black uppercase leading-tight text-primary">
                     • {t.deskripsi_tp}
                   </p>
                 )) : (
@@ -215,14 +221,14 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
           <TableHeader className="bg-muted/10">
             <TableRow className="border-none">
               <TableHead className="w-12 p-8 text-center font-black text-[10px] uppercase text-muted-foreground ">No</TableHead>
-              <TableHead className="w-64 font-black text-[10px] uppercase text-primary ">Nama Lengkap Siswa</TableHead>
-              <TableHead className="w-32 text-center font-black text-[10px] uppercase text-muted-foreground ">Nilai Akhir</TableHead>
-              <TableHead className="font-black text-[10px] uppercase p-6 text-muted-foreground ">Capaian Kompetensi (Narasi Otomatis)</TableHead>
+              <TableHead className="w-64 font-black text-[10px] uppercase text-primary ">Peserta Didik</TableHead>
+              <TableHead className="w-32 text-center font-black text-[10px] uppercase text-muted-foreground ">Nilai</TableHead>
+              <TableHead className="font-black text-[10px] uppercase p-6 text-muted-foreground ">Deskripsi Capaian Kompetensi (Berdasarkan TP)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {students.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="p-20 text-center font-black text-muted-foreground uppercase text-xs  opacity-40">Belum ada siswa terdaftar di kelas ini.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="p-20 text-center font-black text-muted-foreground uppercase text-xs  opacity-30">Tidak ada siswa ditemukan.</TableCell></TableRow>
             ) : (
               students.map((siswa, index) => {
                 const currentNilai = gradesData[siswa.id]?.nilai_angka;
@@ -234,14 +240,14 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
                     <TableCell className="py-6">
                       <div className="flex flex-col">
                         <span className="font-black text-[11px] uppercase tracking-tight leading-none ">{siswa.nama_lengkap}</span>
-                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1 ">SISWA AKTIF</span>
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1 ">AKTIF</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Input 
                         type="number" 
                         placeholder="--"
-                        className={`text-center font-black border-none shadow-inner rounded-2xl h-12 text-sm transition-all  ${isUnderKKTP ? "bg-red-50 text-red-600 ring-2 ring-red-100 shadow-red-200" : "bg-white"}`}
+                        className={`text-center font-black border-none shadow-inner rounded-2xl h-12 text-sm transition-all  ${isUnderKKTP ? "bg-red-500/10 text-red-600 ring-1 ring-red-200" : "bg-white"}`}
                         value={gradesData[siswa.id]?.nilai_angka}
                         onChange={(e) => handleInputChange(siswa.id, 'nilai_angka', e.target.value)}
                       />
@@ -251,7 +257,7 @@ export default function GuruInputNilaiDetailPage({ params }: { params: Promise<{
                         <Textarea 
                           value={gradesData[siswa.id]?.capaian_kompetensi}
                           onChange={(e) => handleInputChange(siswa.id, 'capaian_kompetensi', e.target.value)}
-                          placeholder="Narasi akan muncul otomatis setelah nilai diisi..."
+                          placeholder="Narasi akan terisi otomatis sesuai Tujuan Pembelajaran..."
                           className="min-h-[90px] rounded-[1.8rem] border-none bg-muted/20 text-[11px] font-bold leading-relaxed resize-none focus:bg-white transition-all p-5 shadow-inner "
                         />
                         <Sparkles className="absolute right-4 top-4 w-3.5 h-3.5 text-primary opacity-20 group-hover:opacity-100 transition-opacity" />
