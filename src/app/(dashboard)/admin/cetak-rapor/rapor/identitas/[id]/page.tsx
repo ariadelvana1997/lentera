@@ -1,137 +1,223 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { useState, useEffect, use } from "react"
 import { supabase } from "@/lib/supabase"
-import { Loader2, Printer, ChevronLeft } from "lucide-react"
+import { ChevronLeft, Loader2, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { toast } from "sonner"
 
-export default function CetakIdentitasSiswaPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: siswaId } = use(params)
-  const [student, setStudent] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+export default function CetakBiodataSiswaPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: studentId } = use(params)
+  const [fetching, setFetching] = useState(true)
+  const [data, setData] = useState<any>(null)
+  const [schoolInfo, setSchoolInfo] = useState<any>(null) // Data Pimpinan
+  const [config, setConfig] = useState<any>(null); // Data Titimangsa
 
   useEffect(() => {
-    const fetchSiswa = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*, kelas(nama_kelas)')
-        .eq('id', siswaId)
-        .single()
-      
-      setStudent(data)
-      setLoading(false)
-    }
-    fetchSiswa()
-  }, [siswaId])
+    fetchInitialData()
+  }, [studentId])
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
+  const fetchInitialData = async () => {
+    setFetching(true)
+    try {
+      // 1. Tarik data profil & detail siswa (Join Table)
+      const { data: profile, error: errProfile } = await supabase
+        .from('profiles')
+        .select(`
+          nama_lengkap,
+          data_siswa (
+            nis, nisn, tempat_lahir, tanggal_lahir, 
+            jk, agama, alamat_siswa, 
+            nama_ayah, pekerjaan_ayah, 
+            nama_ibu, pekerjaan_ibu, 
+            nama_wali, pekerjaan_wali
+          )
+        `)
+        .eq('id', studentId)
+        .single()
+
+      if (errProfile) throw errProfile
+      setData(profile)
+
+      // 2. Tarik data referensi sekolah (Untuk KEPSEK)
+      const { data: school } = await supabase
+        .from('sekolah')
+        .select('*')
+        .maybeSingle()
+      setSchoolInfo(school)
+
+      // 3. Tarik data dari tabel konfigurasi_rapor (Untuk Titimangsa)
+      const { data: configData } = await supabase
+        .from('konfigurasi_rapor')
+        .select('*')
+        .maybeSingle(); 
+      
+      setConfig(configData);
+
+    } catch (err: any) {
+      toast.error("Gagal sinkronisasi data: " + err.message)
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  const handlePrint = () => { window.print() }
+
+  if (fetching) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary w-10 h-10" /></div>
+
+  const detail = data?.data_siswa || {}
 
   return (
-    <div className="bg-white min-h-screen font-serif text-black p-0 md:p-10">
-      {/* Kontrol Cetak */}
-      <div className="fixed top-5 right-5 flex gap-2 print:hidden">
-        <Button asChild variant="outline" className="rounded-full">
-          <Link href="/admin/cetak-rapor/rapor"><ChevronLeft className="w-4 h-4 mr-2" /> KEMBALI</Link>
+    <div className="min-h-screen bg-muted/20 pb-20 print:bg-white print:pb-0">
+      {/* CSS KHUSUS PRINT: MEMBERSIHKAN HEADER, FOOTER, & SIDEBAR */}
+      <style jsx global>{`
+        @media print {
+          @page { 
+            margin: 0; 
+          }
+          body { 
+            margin: 1.6cm; 
+            -webkit-print-color-adjust: exact;
+          }
+          aside, header, nav, footer, .print\:hidden {
+            display: none !important;
+          }
+          .min-h-screen {
+            background: white !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
+
+      {/* Toolbar - Sembunyi saat print */}
+      <div className="max-w-[210mm] mx-auto p-6 flex justify-between items-center print:hidden">
+        <Button asChild variant="ghost" className="rounded-full gap-2 font-black uppercase text-[10px]">
+          <Link href="/admin/cetak-rapor/rapor"><ChevronLeft className="w-4 h-4" /> Kembali</Link>
         </Button>
-        <Button onClick={() => window.print()} className="rounded-full font-black shadow-lg">
-          <Printer className="w-4 h-4 mr-2" /> CETAK BIODATA
+        <Button onClick={handlePrint} className="rounded-xl font-black gap-2 shadow-lg shadow-primary/20 uppercase text-[10px] bg-primary text-white px-8">
+          <Printer className="w-4 h-4" /> CETAK BIODATA (PDF)
         </Button>
       </div>
 
-      {/* Kontainer Kertas A4 */}
-      <div className="max-w-[21cm] mx-auto bg-white p-[2cm] border print:border-none shadow-sm print:shadow-none min-h-[29.7cm]">
+      {/* AREA KERTAS A4 */}
+      <div className="max-w-[210mm] mx-auto bg-white shadow-2xl p-[20mm] min-h-[297mm] print:shadow-none print:p-0 print:mx-0 animate-in fade-in duration-1000 ">
         
-        <h2 className="text-center font-bold text-base uppercase mb-10 tracking-widest underline">
-          IDENTITAS PESERTA DIDIK
-        </h2>
-
-        <div className="space-y-4 text-[12px] leading-relaxed">
-          {/* Baris Data */}
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>1.</span><span>Nama Lengkap Peserta Didik</span><span>:</span>
-            <span className="font-bold uppercase">{student?.nama_lengkap || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>2.</span><span>NISN / NIS</span><span>:</span>
-            <span>{student?.nisn || "-"} / {student?.nis || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>3.</span><span>Tempat, Tanggal Lahir</span><span>:</span>
-            <span>{student?.tempat_lahir || "-"}, {student?.tanggal_lahir || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>4.</span><span>Jenis Kelamin</span><span>:</span>
-            <span>{student?.jenis_kelamin || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>5.</span><span>Agama</span><span>:</span>
-            <span>{student?.agama || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>6.</span><span>Alamat Peserta Didik</span><span>:</span>
-            <span>{student?.alamat || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>7.</span><span>Nama Orang Tua</span><span></span><span></span>
-          </div>
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2 pl-6">
-            <span></span><span>a. Ayah</span><span>:</span>
-            <span>{student?.nama_ayah || "-"}</span>
-          </div>
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2 pl-6">
-            <span></span><span>b. Ibu</span><span>:</span>
-            <span>{student?.nama_ibu || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>8.</span><span>Pekerjaan Orang Tua</span><span>:</span>
-            <span>{student?.pekerjaan_orang_tua || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>9.</span><span>Sekolah Asal</span><span>:</span>
-            <span>{student?.sekolah_asal || "-"}</span>
-          </div>
-
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2">
-            <span>10.</span><span>Diterima di Sekolah ini</span><span></span><span></span>
-          </div>
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2 pl-6">
-            <span></span><span>a. Di Kelas</span><span>:</span>
-            <span>{student?.kelas?.nama_kelas || "-"}</span>
-          </div>
-          <div className="grid grid-cols-[30px_250px_10px_1fr] gap-2 pl-6">
-            <span></span><span>b. Pada Tanggal</span><span>:</span>
-            <span>14 Juli 2025</span> {/* Statis atau ambil dari created_at */}
-          </div>
+        <div className="text-center mb-10">
+          <h2 className="text-lg font-bold uppercase tracking-widest leading-tight">KETERANGAN TENTANG DIRI PESERTA DIDIK</h2>
         </div>
 
-        {/* Bagian Tanda Tangan & Foto */}
-        <div className="mt-20 grid grid-cols-2">
-          <div className="flex flex-col items-center justify-center">
-            <div className="w-[3cm] h-[4cm] border border-black flex items-center justify-center text-[10px] text-gray-400">
-              Pas Foto <br /> 3 x 4
-            </div>
+        <div className="space-y-4 text-[13px] leading-relaxed">
+          <table className="w-full">
+            <tbody>
+              {/* --- DATA SISWA 1 SAMPAI 10 --- */}
+              <tr>
+                <td className="w-[5%] align-top py-1.5 font-bold">1.</td>
+                <td className="w-[35%] align-top py-1.5 uppercase font-medium">Nama Peserta Didik (Lengkap)</td>
+                <td className="w-[2%] align-top py-1.5">:</td>
+                <td className="w-[58%] align-top py-1.5 font-black uppercase text-primary">{data?.nama_lengkap || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">2.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Nomor Induk / NISN</td>
+                <td className="align-top py-1.5">:</td>
+                <td className="align-top py-1.5 font-bold uppercase">{detail.nis || '-'} / {detail.nisn || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">3.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Tempat, Tanggal Lahir</td>
+                <td className="align-top py-1.5">:</td>
+                <td className="align-top py-1.5 uppercase">{detail.tempat_lahir || '-'}, {detail.tanggal_lahir || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">4.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Jenis Kelamin</td>
+                <td className="align-top py-1.5">:</td>
+                <td className="align-top py-1.5 uppercase">{detail.jk || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">5.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Agama</td>
+                <td className="align-top py-1.5">:</td>
+                <td className="align-top py-1.5 uppercase">{detail.agama || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">6.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Alamat Peserta Didik</td>
+                <td className="align-top py-1.5">:</td>
+                <td className="align-top py-1.5 uppercase">{detail.alamat_siswa || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">7.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Nama Orang Tua</td>
+                <td colSpan={2}></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td className="align-top py-1 uppercase pl-4">a. Ayah</td>
+                <td className="align-top py-1">:</td>
+                <td className="align-top py-1 uppercase font-bold">{detail.nama_ayah || '-'}</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td className="align-top py-1 uppercase pl-4">b. Ibu</td>
+                <td className="align-top py-1">:</td>
+                <td className="align-top py-1 uppercase font-bold">{detail.nama_ibu || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">8.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Pekerjaan Orang Tua</td>
+                <td colSpan={2}></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td className="align-top py-1 uppercase pl-4">a. Ayah</td>
+                <td className="align-top py-1">:</td>
+                <td className="align-top py-1 uppercase">{detail.pekerjaan_ayah || '-'}</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td className="align-top py-1 uppercase pl-4">b. Ibu</td>
+                <td className="align-top py-1">:</td>
+                <td className="align-top py-1 uppercase">{detail.pekerjaan_ibu || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">9.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Nama Wali</td>
+                <td className="align-top py-1.5">:</td>
+                <td className="align-top py-1.5 uppercase font-bold">{detail.nama_wali || '-'}</td>
+              </tr>
+              <tr>
+                <td className="align-top py-1.5 font-bold">10.</td>
+                <td className="align-top py-1.5 uppercase font-medium">Pekerjaan Wali</td>
+                <td className="align-top py-1.5">:</td>
+                <td className="align-top py-1.5 uppercase">{detail.pekerjaan_wali || '-'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* TANDA TANGAN SECTION */}
+        <div className="mt-28 flex justify-between items-start px-10">
+          <div className="w-32 h-40 border border-slate-400 flex items-center justify-center text-[10px] text-slate-400 font-black text-center uppercase">
+            Pas Foto <br /> 3 x 4
           </div>
-          <div className="text-[12px] space-y-16">
-            <div className="text-center">
-              <p>Samarinda, 25 Maret 2026</p>
-              <p>Kepala Sekolah,</p>
-            </div>
-            <div className="text-center font-bold">
-              <p className="underline uppercase">Maryono, S.Pd</p>
-              <p>NIP. 197208042006041014</p>
+          
+          <div className="text-[13px]">
+            {/* Sesuai konfigurasi_rapor */}
+            <p>
+              {config?.lokasi || "Tasikmalaya"}, {config?.tanggal_terbit || "......................... 20..."}
+            </p>
+            <p className="mt-1 font-medium">Kepala Sekolah,</p>
+            <div className="mt-28">
+              {/* Bagian KEPSEK & NUPTK tetap sesuai data sekolah */}
+              <p className="font-black underline uppercase">
+                {schoolInfo?.kepala_sekolah || "DRS. NAMA KEPALA SEKOLAH, M.PD"}
+              </p>
+              <p className="font-bold">NUPTK. {schoolInfo?.nip_kepala_sekolah || "........................................"}</p>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   )
