@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { 
   FileText, Loader2, Star, Sparkles, 
-  ClipboardCheck, Info 
+  ClipboardCheck, Info, Save, CheckCircle2, AlertTriangle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "sonner"
 
-// --- PEMETAAN SUBDIMENSI OTOMATIS ---
 const SUBDIMENSI_MAP: Record<string, string> = {
   "keimanan dan ketakwaan terhadap Tuhan Yang Maha Esa": "hubungan dengan tuhan yang maha esa",
   "kewargaan": "kewargaan lokal",
@@ -28,6 +27,7 @@ const SUBDIMENSI_MAP: Record<string, string> = {
 
 export default function WaliKelasDeskripsiKokurikulerPage() {
   const [fetching, setFetching] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [projects, setProjects] = useState<any[]>([])
   const [selectedProject, setSelectedProject] = useState("")
   const [students, setStudents] = useState<any[]>([])
@@ -79,19 +79,13 @@ export default function WaliKelasDeskripsiKokurikulerPage() {
         if (siswaGrades.length === 0) {
           deskripsi = "Data nilai belum diinput untuk siswa ini."
         } else {
-          // Menentukan predikat umum (jika ada Mahir, sebut Sangat Baik)
           const hasMahir = siswaGrades.some(g => g.nilai_huruf === "Mahir")
           const predikatUmum = hasMahir ? "sangat baik" : "baik"
-
-          // 1. Kalimat Pembuka
           deskripsi = `Pada semester ini, ananda menunjukkan capaian yang ${predikatUmum} dalam penguatan profil lulusan, yang ditunjukkan melalui kegiatan kokurikuler ${currentProjectName.toUpperCase()}. `
-
-          // 2. Perincian per Dimensi (Looping data yang ada di DB)
           const rincianDimensi = siswaGrades.map(g => {
             const subName = SUBDIMENSI_MAP[g.dimensi_id] || "capaian terkait"
             return `Pada dimensi ${g.dimensi_id}, ananda ${g.nilai_huruf.toLowerCase()} dalam subdimensi ${subName}.`
           })
-
           deskripsi += rincianDimensi.join(" ")
         }
 
@@ -104,6 +98,44 @@ export default function WaliKelasDeskripsiKokurikulerPage() {
       toast.error(err.message)
     } finally {
       setFetching(false)
+    }
+  }
+
+  // 🚀 FUNGSI SIMPAN DENGAN PENGECEKAN ERROR TINGKAT TINGGI
+  const handleSaveAll = async () => {
+    if (students.length === 0) return toast.error("Generate narasi terlebih dahulu!")
+    setSaving(true)
+    try {
+      const dataToSave = students
+        .filter(s => s.hasGrades)
+        .map(s => ({
+          siswa_id: s.id,
+          deskripsi: s.deskripsi
+        }))
+
+      if (dataToSave.length === 0) {
+        toast.error("Tidak ada narasi valid untuk disimpan (Cek nilai siswa)");
+        setSaving(false);
+        return;
+      }
+
+      // Tembak ke tabel 'kokurikuler'
+      const { error } = await supabase
+        .from('kokurikuler')
+        .upsert(dataToSave, { onConflict: 'siswa_id' })
+
+      if (error) {
+        // --- 🕵️ LOG PESAN ASLI DARI DATABASE ---
+        console.error("DEBUG SAVE ERROR:", error);
+        throw new Error(error.message || "Terjadi kesalahan pada database (Cek Tabel Kokurikuler)");
+      }
+
+      toast.success("Narasi rapor berhasil disimpan ke database!")
+    } catch (err: any) {
+      console.error(err)
+      toast.error("ERROR: " + err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -133,57 +165,60 @@ export default function WaliKelasDeskripsiKokurikulerPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={generateReport} disabled={fetching} className="h-12 rounded-xl font-black uppercase tracking-widest text-[10px]  bg-primary text-white shadow-lg shadow-primary/20">
-            <Sparkles className="w-4 h-4 mr-2" /> Susun Deskripsi Rinci
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={generateReport} disabled={fetching} className="h-12 flex-1 rounded-xl font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-lg shadow-primary/20">
+              <Sparkles className="w-4 h-4 mr-2" /> Susun Deskripsi
+            </Button>
+            
+            {students.length > 0 && (
+              <Button onClick={handleSaveAll} disabled={saving} className="h-12 flex-1 rounded-xl font-black uppercase tracking-widest text-[10px] bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                Simpan ke Rapor
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
       {students.length > 0 && (
         <div className="animate-in slide-in-from-bottom-4 duration-500">
           <Card className="border-none shadow-2xl bg-card/40 backdrop-blur-sm rounded-[3rem] overflow-hidden">
-             <div className="p-6 bg-primary/5 border-b border-primary/10 flex items-center justify-between">
+              <div className="p-6 bg-primary/5 border-b border-primary/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                   <ClipboardCheck className="text-primary w-5 h-5" />
-                   <h3 className="text-xs font-black uppercase tracking-wider">Hasil Generate Deskripsi</h3>
+                    <ClipboardCheck className="text-primary w-5 h-5" />
+                    <h3 className="text-xs font-black uppercase tracking-wider">Pratinjau Narasi</h3>
                 </div>
                 <Badge variant="outline" className="border-primary/20 text-primary font-black uppercase text-[9px]">
-                   KELAS {myClass?.nama_kelas}
+                    KELAS {myClass?.nama_kelas}
                 </Badge>
-             </div>
-             <Table>
-               <TableHeader>
-                 <TableRow className="bg-muted/10 border-none">
-                   <TableHead className="w-12 text-center font-black text-[10px] uppercase">No</TableHead>
-                   <TableHead className="w-48 font-black text-[10px] uppercase text-primary">Nama Siswa</TableHead>
-                   <TableHead className="font-black text-[10px] uppercase">Narasi Lengkap Rapor</TableHead>
-                 </TableRow>
-               </TableHeader>
-               <TableBody>
-                 {students.map((s, i) => (
-                   <TableRow key={s.id} className="border-border/40 hover:bg-muted/5 transition-colors">
-                     <TableCell className="text-center font-black text-muted-foreground/40">{i+1}</TableCell>
-                     <TableCell className="font-black text-[11px] uppercase align-top pt-5 text-primary">{s.nama_lengkap}</TableCell>
-                     <TableCell className="py-5 leading-relaxed">
-                        <div className={`p-5 rounded-[1.8rem] text-[11px] font-bold border transition-all ${s.hasGrades ? "bg-background/60 border-primary/10 text-foreground/80" : "bg-red-50 text-red-500 border-red-100"}`}>
-                           {s.deskripsi}
-                        </div>
-                     </TableCell>
-                   </TableRow>
-                 ))}
-               </TableBody>
-             </Table>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/10 border-none text-[10px] uppercase font-black">
+                    <TableHead className="w-12 text-center">No</TableHead>
+                    <TableHead className="w-48 text-primary">Nama Siswa</TableHead>
+                    <TableHead>Narasi Lengkap Rapor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {students.map((s, i) => (
+                    <TableRow key={s.id} className="border-border/40 hover:bg-muted/5 transition-colors">
+                      <TableCell className="text-center font-black text-muted-foreground/40">{i+1}</TableCell>
+                      <TableCell className="font-black text-[11px] uppercase align-top pt-5 text-primary">{s.nama_lengkap}</TableCell>
+                      <TableCell className="py-5 leading-relaxed">
+                         <div className={`p-5 rounded-[1.8rem] text-[11px] font-bold border transition-all ${s.hasGrades ? "bg-background/60 border-primary/10 text-foreground/80" : "bg-red-50 text-red-500 border-red-100"}`}>
+                            {s.deskripsi}
+                            {s.hasGrades && <div className="mt-2 flex items-center gap-1 text-[9px] text-green-600 uppercase font-black"><CheckCircle2 className="w-3 h-3"/> Siap Simpan</div>}
+                            {!s.hasGrades && <div className="mt-2 flex items-center gap-1 text-[9px] text-red-500 uppercase font-black"><AlertTriangle className="w-3 h-3"/> Nilai Kosong</div>}
+                         </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
           </Card>
         </div>
       )}
-
-      <div className="flex items-center gap-2 p-4 bg-primary/5 rounded-2xl border border-primary/10">
-         <Info className="w-4 h-4 text-primary" />
-         <p className="text-[9px] font-bold text-muted-foreground uppercase leading-tight">
-            Narasi di atas disusun berdasarkan nilai (Berkembang, Cakap, Mahir) yang Anda input di menu Penilaian. <br/> 
-            Setiap dimensi memiliki subdimensi yang sudah disesuaikan dengan panduan kurikulum sekolah.
-         </p>
-      </div>
     </div>
   )
 }
