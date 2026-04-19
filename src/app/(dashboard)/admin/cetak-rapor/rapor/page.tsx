@@ -1,14 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, ChangeEvent } from "react"
 import { supabase } from "@/lib/supabase"
 import { 
   Printer, Users, Search, Loader2, 
-  FileText, UserCircle, LayoutGrid, ChevronRight 
+  FileText, UserCircle, LayoutGrid, ChevronRight,
+  Settings2, ImageIcon, Trash2, MoveHorizontal, Ghost, Type
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox" // 🚀 Pastikan shadcn checkbox terinstall
+import { Slider } from "@/components/ui/slider"     // 🚀 Pastikan shadcn slider terinstall
 import {
   Select, SelectContent, SelectItem, 
   SelectTrigger, SelectValue 
@@ -17,6 +20,13 @@ import {
   Table, TableBody, TableCell, TableHead, 
   TableHeader, TableRow 
 } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog" // 🚀 Pastikan shadcn dialog terinstall
 import { toast } from "sonner"
 import Link from "next/link"
 
@@ -26,6 +36,14 @@ export default function MenuCetakRaporPage() {
   const [selectedClass, setSelectedClass] = useState("")
   const [students, setStudents] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+
+  // 🚀 STATE KHUSUS BULK & MODAL
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
+  const [bulkTitle, setBulkTitle] = useState("LAPORAN HASIL BELAJAR")
+  const [bulkBg, setBulkBg] = useState<string | null>(null)
+  const [bulkScale, setBulkScale] = useState(80)
+  const [bulkOpacity, setBulkOpacity] = useState(0.1)
 
   useEffect(() => {
     fetchClasses()
@@ -42,48 +60,72 @@ export default function MenuCetakRaporPage() {
 
   const loadStudents = async (classId: string) => {
     setFetching(true)
+    setSelectedIds([]) // Reset pilihan saat ganti kelas
     try {
-      console.log("Mencari siswa untuk kelas ID:", classId);
-
       const { data, error } = await supabase
-  .from('profiles')
-  .select('id, nama_lengkap, nisn, roles') // Kolom nisn sekarang sudah ada!
-  .eq('kelas_id', classId)
-  .filter('roles', 'cs', '{"Siswa"}')
+        .from('profiles')
+        .select('id, nama_lengkap, nisn, roles')
+        .eq('kelas_id', classId)
+        .filter('roles', 'cs', '{"Siswa"}')
         .order('nama_lengkap')
 
-      if (error) {
-        console.error("Kesalahan database:", error.message);
-        toast.error(error.message);
-      }
-
-      console.log("Siswa ditemukan:", data);
+      if (error) toast.error(error.message);
       setStudents(data || [])
-
-      if (data?.length === 0) {
-        toast.info("Data siswa tidak ditemukan. Pastikan 'kelas_id' dan 'role' siswa sudah benar.");
-      }
     } finally {
       setFetching(false)
     }
   }
+
+  // 🚀 HANDLER SELECTION
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredStudents.map(s => s.id))
+    } else {
+      setSelectedIds([])
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const handleUploadBg = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setBulkBg(URL.createObjectURL(e.target.files[0]))
+    }
+  }
+
   const filteredStudents = students.filter(s => 
     s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20">
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3  uppercase">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3 uppercase">
             <Printer className="w-8 h-8 text-primary" /> Cetak Rapor
           </h1>
           <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mt-1">
             Pusat Pencetakan Dokumen Hasil Belajar Siswa
           </p>
         </div>
+
+        {/* 🚀 TOMBOL BULK ACTION (Hanya muncul jika ada yang dipilih) */}
+        {selectedIds.length > 0 && (
+          <Button 
+            onClick={() => setIsBulkModalOpen(true)}
+            className="rounded-2xl font-black text-xs uppercase px-8 shadow-xl shadow-primary/20 animate-in zoom-in-95"
+          >
+            <Settings2 className="w-4 h-4 mr-2" /> Opsi Cetak Masal ({selectedIds.length})
+          </Button>
+        )}
       </div>
 
+      {/* FILTER KELAS */}
       <Card className="border-none shadow-sm bg-card/40 backdrop-blur-sm rounded-[2rem] p-6">
         <div className="flex flex-col md:flex-row items-center gap-4">
           <div className="flex items-center gap-3 min-w-[200px]">
@@ -124,7 +166,13 @@ export default function MenuCetakRaporPage() {
           <Table>
             <TableHeader className="bg-muted/10">
               <TableRow className="border-none">
-                <TableHead className="w-12 text-center font-black text-[10px] uppercase p-6">No</TableHead>
+                {/* 🚀 CHECKBOX SELECT ALL */}
+                <TableHead className="w-12 text-center p-6">
+                  <Checkbox 
+                    checked={selectedIds.length === filteredStudents.length && filteredStudents.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
+                </TableHead>
                 <TableHead className="font-black text-[10px] uppercase text-primary">Nama Lengkap Siswa</TableHead>
                 <TableHead className="hidden md:table-cell font-black text-[10px] uppercase text-muted-foreground text-center">NISN</TableHead>
                 <TableHead className="text-right font-black text-[10px] uppercase p-6">Opsi Cetak</TableHead>
@@ -137,8 +185,17 @@ export default function MenuCetakRaporPage() {
                 <TableRow><TableCell colSpan={4} className="h-40 text-center font-bold text-muted-foreground uppercase text-[10px] ">Siswa tidak ditemukan.</TableCell></TableRow>
               ) : filteredStudents.map((s, index) => (
                 <TableRow key={s.id} className="hover:bg-muted/5 border-border/50 transition-colors">
-                  <TableCell className="text-center font-bold text-muted-foreground">{index + 1}</TableCell>
-                  <TableCell className="font-black text-[11px] uppercase py-4">{s.nama_lengkap}</TableCell>
+                  {/* 🚀 CHECKBOX INDIVIDU */}
+                  <TableCell className="text-center p-6">
+                    <Checkbox 
+                      checked={selectedIds.includes(s.id)}
+                      onCheckedChange={() => toggleSelect(s.id)}
+                    />
+                  </TableCell>
+                  <TableCell className="font-black text-[11px] uppercase py-4">
+                    {s.nama_lengkap}
+                    <div className="md:hidden text-[9px] text-muted-foreground mt-0.5">NISN: {s.nisn || "-"}</div>
+                  </TableCell>
                   <TableCell className="hidden md:table-cell text-center font-bold text-xs text-muted-foreground">{s.nisn || "-"}</TableCell>
                   <TableCell className="text-right p-4">
                     <div className="flex justify-end gap-2">
@@ -160,6 +217,89 @@ export default function MenuCetakRaporPage() {
           </Table>
         </Card>
       )}
+
+      {/* 🚀 MODAL POPUP SETTING BULK */}
+      <Dialog open={isBulkModalOpen} onOpenChange={setIsBulkModalOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-primary p-8 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-3 text-white">
+                <Settings2 className="w-6 h-6"/> Setting Masal
+              </DialogTitle>
+              <p className="text-[10px] text-white/70 font-black uppercase tracking-widest mt-1">
+                Berlaku untuk {selectedIds.length} siswa terpilih
+              </p>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8 space-y-8 bg-white">
+            {/* INPUT JUDUL */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
+                <Type className="w-3 h-3 text-primary"/> Judul Laporan (Manual)
+              </label>
+              <Input 
+                value={bulkTitle}
+                onChange={(e) => setBulkTitle(e.target.value.toUpperCase())}
+                placeholder="CONTOH: RAPOR TENGAH SEMESTER"
+                className="font-black rounded-2xl border-muted bg-muted/20 uppercase text-xs h-12 focus-visible:ring-primary"
+              />
+            </div>
+
+            {/* WATERMARK */}
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
+                <ImageIcon className="w-3 h-3 text-primary"/> Watermark / Background
+              </label>
+              
+              {!bulkBg ? (
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-[2rem] p-8 hover:bg-muted/30 cursor-pointer transition-all">
+                   <ImageIcon className="w-10 h-10 text-muted mb-2"/>
+                   <span className="text-[10px] font-black text-muted-foreground uppercase">Klik untuk Upload Logo</span>
+                   <input type="file" className="hidden" accept="image/*" onChange={handleUploadBg} />
+                </label>
+              ) : (
+                <div className="space-y-6 p-6 bg-muted/20 rounded-[2rem] border border-muted/50 animate-in zoom-in-95">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-primary uppercase">Watermark Aktif</span>
+                    <Button variant="ghost" size="icon" onClick={() => setBulkBg(null)} className="h-8 w-8 text-red-500 hover:bg-red-50 rounded-full"><Trash2 className="w-4 h-4"/></Button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground">
+                      <span className="flex items-center gap-1"><MoveHorizontal className="w-3 h-3"/> Ukuran</span>
+                      <span className="text-primary">{bulkScale}%</span>
+                    </div>
+                    <Slider value={[bulkScale]} max={150} min={10} onValueChange={(v) => setBulkScale(v[0])} />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground">
+                      <span className="flex items-center gap-1"><Ghost className="w-3 h-3"/> Transparansi</span>
+                      <span className="text-primary">{Math.round(bulkOpacity * 100)}%</span>
+                    </div>
+                    <Slider value={[bulkOpacity * 100]} max={100} min={0} onValueChange={(v) => setBulkOpacity(v[0]/100)} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="p-8 bg-muted/10 gap-3">
+            <Button variant="ghost" onClick={() => setIsBulkModalOpen(false)} className="rounded-2xl font-black uppercase text-[10px]">Batal</Button>
+            <Button 
+              className="rounded-2xl bg-primary font-black uppercase text-[10px] px-10 h-12 shadow-xl shadow-primary/20"
+              onClick={() => {
+                const ids = selectedIds.join(',');
+                // 🚀 REDIRECT KE HALAMAN BULK (Akan kita buat setelah ini)
+                window.open(`/admin/cetak-rapor/rapor/bulk?ids=${ids}&title=${encodeURIComponent(bulkTitle)}&scale=${bulkScale}&opacity=${bulkOpacity}`, '_blank');
+              }}
+            >
+              Proses Cetak Terpilih
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

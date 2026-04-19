@@ -2,10 +2,11 @@
 
 import { use, useEffect, useState, ChangeEvent } from "react"
 import { supabase } from "@/lib/supabase"
-import { Loader2, Printer, ChevronLeft, UserX, ImageIcon, Trash2, MoveHorizontal, Ghost } from "lucide-react"
+import { Loader2, Printer, ChevronLeft, UserX, ImageIcon, Trash2, MoveHorizontal, Ghost, Type } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input" // 🚀 Pastikan shadcn input sudah terinstall
 import Link from "next/link"
-import { Slider } from "@/components/ui/slider" // Pastikan shadcn slider sudah terinstall
+import { Slider } from "@/components/ui/slider"
 
 export default function PrintIsiRaporPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: siswaId } = use(params)
@@ -15,10 +16,11 @@ export default function PrintIsiRaporPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  // 🚀 STATE FITUR SPESIAL BACKGROUND
+  // 🚀 STATE FITUR SPESIAL (BACKGROUND & JUDUL)
   const [bgImage, setBgImage] = useState<string | null>(null)
-  const [bgScale, setBgScale] = useState<number>(80) // default 80% ukuran
-  const [bgOpacity, setBgOpacity] = useState<number>(0.1) // default tipis 10%
+  const [bgScale, setBgScale] = useState<number>(80) 
+  const [bgOpacity, setBgOpacity] = useState<number>(0.1) 
+  const [reportTitle, setReportTitle] = useState<string>("LAPORAN HASIL BELAJAR")
 
   // Fungsi Upload Gambar Lokal
   const handleUploadBg = (e: ChangeEvent<HTMLInputElement>) => {
@@ -108,53 +110,60 @@ export default function PrintIsiRaporPage({ params }: { params: Promise<{ id: st
             position: relative !important; overflow: hidden !important;
           }
           table td, table th { border: 1px solid black !important; padding: 6px !important; }
-          /* Memastikan background image ikut tercetak */
           .bg-print-fix { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
 
-      {/* 🛠️ TOOLBAR KHUSUS BACKGROUND (HIDDEN SAAT PRINT) */}
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur border shadow-2xl rounded-2xl p-4 flex flex-col gap-4 print:hidden z-50 w-[350px]">
+      {/* 🛠️ TOOLBAR KHUSUS (FITUR SPECIAL) */}
+      <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md border shadow-2xl rounded-3xl p-5 flex flex-col gap-4 print:hidden z-50 w-[380px] border-primary/20 animate-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between border-b pb-2">
-           <span className="text-[10px] font-black uppercase flex items-center gap-2"><ImageIcon className="w-3 h-3"/> Fitur Special: Background Rapor</span>
+           <span className="text-[10px] font-black uppercase flex items-center gap-2 text-primary">
+             <div className="w-2 h-2 bg-primary rounded-full animate-pulse"/> Panel Kontrol Rapor
+           </span>
            {bgImage && (
-             <Button variant="ghost" size="icon" onClick={() => setBgImage(null)} className="h-6 w-6 text-red-500 hover:bg-red-50">
+             <Button variant="ghost" size="icon" onClick={() => setBgImage(null)} className="h-6 w-6 text-red-500 hover:bg-red-50 rounded-full">
                <Trash2 className="w-3 h-3"/>
              </Button>
            )}
         </div>
         
         <div className="space-y-4">
+           {/* EDIT JUDUL */}
+           <div className="space-y-1.5">
+              <label className="text-[9px] font-black uppercase text-gray-400 flex items-center gap-1">
+                <Type className="w-3 h-3"/> Judul Laporan
+              </label>
+              <Input 
+                value={reportTitle}
+                onChange={(e) => setReportTitle(e.target.value.toUpperCase())}
+                placeholder="Ganti Judul Di Sini..."
+                className="h-8 text-[11px] font-bold uppercase rounded-lg border-gray-200 focus:ring-primary transition-all"
+              />
+           </div>
+
+           {/* BACKGROUND CONTROLS */}
            {!bgImage ? (
-             <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-4 hover:bg-gray-50 cursor-pointer transition-all">
-                <ImageIcon className="w-8 h-8 text-gray-400 mb-2"/>
-                <span className="text-[10px] font-bold text-gray-500 uppercase">Klik untuk Upload Watermark</span>
+             <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl p-4 hover:border-primary hover:bg-primary/5 cursor-pointer transition-all">
+                <ImageIcon className="w-8 h-8 text-gray-300 mb-2"/>
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Upload Watermark</span>
                 <input type="file" className="hidden" accept="image/*" onChange={handleUploadBg} />
              </label>
            ) : (
              <div className="space-y-4 animate-in zoom-in-95 duration-300">
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-bold uppercase">
-                    <span className="flex items-center gap-1"><MoveHorizontal className="w-3 h-3"/> Geser Ukuran</span>
+                  <div className="flex justify-between text-[9px] font-bold uppercase text-gray-500">
+                    <span className="flex items-center gap-1"><MoveHorizontal className="w-3 h-3"/> Ukuran Gambar</span>
                     <span>{bgScale}%</span>
                   </div>
-                  <Slider 
-                    value={[bgScale]} 
-                    max={150} min={10} step={1} 
-                    onValueChange={(val) => setBgScale(val[0])} 
-                  />
+                  <Slider value={[bgScale]} max={150} min={10} step={1} onValueChange={(val) => setBgScale(val[0])} />
                 </div>
 
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-bold uppercase">
+                  <div className="flex justify-between text-[9px] font-bold uppercase text-gray-500">
                     <span className="flex items-center gap-1"><Ghost className="w-3 h-3"/> Transparansi</span>
                     <span>{Math.round(bgOpacity * 100)}%</span>
                   </div>
-                  <Slider 
-                    value={[bgOpacity * 100]} 
-                    max={100} min={0} step={1} 
-                    onValueChange={(val) => setBgOpacity(val[0] / 100)} 
-                  />
+                  <Slider value={[bgOpacity * 100]} max={100} min={0} step={1} onValueChange={(val) => setBgOpacity(val[0] / 100)} />
                 </div>
              </div>
            )}
@@ -166,32 +175,21 @@ export default function PrintIsiRaporPage({ params }: { params: Promise<{ id: st
         <Button asChild variant="outline" className="rounded-full bg-white shadow-xl font-bold uppercase text-[10px]">
            <Link href="/admin/cetak-rapor/rapor"><ChevronLeft className="w-4 h-4 mr-2"/> KEMBALI</Link>
         </Button>
-        <Button onClick={() => window.print()} className="rounded-full shadow-2xl font-black bg-primary text-white px-8 uppercase text-[10px]">
+        <Button onClick={() => window.print()} className="rounded-full shadow-2xl font-black bg-primary text-white px-8 uppercase text-[10px] hover:scale-105 transition-transform">
           <Printer className="mr-2 w-4 h-4" /> CETAK RAPOR
         </Button>
       </div>
 
       <div className="paper-container max-w-[21cm] mx-auto bg-white p-[1.2cm] border relative">
         
-        {/* 🚀 BACKGROUND IMAGE (LAYER PALING BELAKANG) */}
+        {/* 🚀 BACKGROUND IMAGE */}
         {bgImage && (
-          <div 
-            className="absolute inset-0 flex items-center justify-center pointer-events-none bg-print-fix"
-            style={{ zIndex: 0 }}
-          >
-            <img 
-              src={bgImage} 
-              alt="rapor-bg" 
-              style={{ 
-                width: `${bgScale}%`, 
-                opacity: bgOpacity,
-              }}
-              className="object-contain"
-            />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-print-fix" style={{ zIndex: 0 }}>
+            <img src={bgImage} alt="rapor-bg" style={{ width: `${bgScale}%`, opacity: bgOpacity }} className="object-contain" />
           </div>
         )}
 
-        {/* Konten Rapor (Z-index 1 agar di atas background) */}
+        {/* Konten Rapor */}
         <div className="relative" style={{ zIndex: 1 }}>
           {/* HEADER IDENTITAS */}
           <div className="grid grid-cols-2 text-[11px] mb-8 font-bold leading-relaxed">
@@ -209,9 +207,11 @@ export default function PrintIsiRaporPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          <h2 className="text-center font-black text-sm uppercase mb-4 tracking-widest">LAPORAN HASIL BELAJAR</h2>
+          {/* 🎯 JUDUL DINAMIS */}
+          <h2 className="text-center font-black text-sm uppercase mb-4 tracking-widest">
+            {reportTitle || "LAPORAN HASIL BELAJAR"}
+          </h2>
 
-          {/* TABEL NILAI */}
           <table className="w-full border-collapse text-[11px] mb-0 bg-transparent">
             <thead>
               <tr className="text-center font-bold bg-gray-50/30 uppercase">
@@ -235,7 +235,6 @@ export default function PrintIsiRaporPage({ params }: { params: Promise<{ id: st
             </tbody>
           </table>
 
-          {/* TABEL EKSTRAKURIKULER */}
           <table className="w-full border-collapse text-[11px] -mt-[1px] mb-6">
             <thead>
               <tr className="text-center font-bold uppercase bg-gray-50/30 text-[10px]">
